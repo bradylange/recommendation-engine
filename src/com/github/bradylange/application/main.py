@@ -1,5 +1,5 @@
 # Developer: Brady Lange
-# Date: 08/18/2019
+# Date: 08/19/2019
 # Description:
 
 # Import requires libraries
@@ -50,6 +50,13 @@ print(beers.corr())
 # One Hot Encode, drop first encoded column to prevent multicollinearity
 beers = pd.get_dummies(beers, drop_first = True)
 
+# 80% training data, 20% validation data
+split = np.random.rand(len(beers)) < 0.8
+# Instantiate training data
+train = beers[split]
+# Instantiate validation data
+validate = beers[~split]
+
 # Autoencoder - Dimensionality Reduction
 # =============================================================================
 inputDim = beers.shape[1]
@@ -83,29 +90,33 @@ decoder = autoencoder.layers[-1](decoder)
 decoder = Model(codedInput, decoder)
 
 # Configure Autoencoder model
-autoencoder.compile(optimizer = "sgd", loss = "mean_squared_error",
+autoencoder.compile(optimizer = "adam", loss = "binary_crossentropy",
                     metrics = ["accuracy"])
 
 modCheck = ModelCheckpoint(r"models\checkpoints\weights_{epoch:02d}_{val_loss:.2f}.hdf5",
                            mode = "min")
 erlyStop = EarlyStopping(monitor = "val_loss", patience = 2)
 # Train Autoencoder model
-autoencoder.fit(beers, beers,
-                epochs = 10,
+autoencoder.fit(train, train,
+                epochs = 1,
                 batch_size = 128,
-                shuffle = True)
+                shuffle = True,
+                validation_data = [validate, validate])
                 #callbacks = [modCheck, erlyStop])
 
 # Encode/Decode Data
 # =============================================================================
-encodedBeers = encoder.predict(beers)
-decodedBeers = decoder.predict(encodedBeers)
+encodedValidate = encoder.predict(validate)
+decodedValidate = pd.DataFrame(decoder.predict(encodedValidate))
+decodedValidate.columns = validate.columns
+print("Original Dataset:\n", validate)
+print("Reconstructed Dataset:\n", decodedValidate)
 
 # K-Means Clustering
 # =============================================================================
 km = KMeans(n_clusters = 3)
-km.fit(encodedBeers)
-km.predict(encodedBeers)
+km.fit(encodedValidate)
+km.predict(encodedValidate)
 
 # Recommendation Engine
 # =============================================================================
