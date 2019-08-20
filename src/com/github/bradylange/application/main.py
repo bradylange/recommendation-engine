@@ -11,6 +11,7 @@ from keras.models import Model
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics.pairwise import distance, linear_kernel
 from sklearn.cluster import KMeans
 
 # Load and Explore Data
@@ -118,5 +119,47 @@ km = KMeans(n_clusters = 3)
 km.fit(encodedValidate)
 km.predict(encodedValidate)
 
+def getEuclideanDistance(centroids, inputRow):
+    # Euclidean Distance
+    return distance.euclidean(centroids, inputRow)
+def getCosineSimilarity(centroids, inputRow):
+    # Cosine Similarity
+    return distance.cosine(centroids, inputRow)
+def getClustersDistances(centroids, numClusters, inputRow):
+    simMat = {}
+    for i in range(0, numClusters):
+        simMatRow = getEuclideanDistance(centroids[i], inputRow)
+        simMat.update({"Cluster " + str(i): simMatRow})
+    return simMat
+
+simMat = np.zeros([encodedValidate.shape[0], 3])
+for i in range(0, encodedValidate.shape[0]):
+    euclDist = getClustersDistances(km.cluster_centers_, 3, encodedValidate[i])
+    euclDist = list(euclDist.values())
+    simMat[i] = euclDist
+print(simMat)
+
 # Recommendation Engine
 # =============================================================================
+# Calculate Cosine Similarity
+cosineSimilarity = linear_kernel(simMat, simMat)
+
+# TODO:
+newBeers = train.append(beersId)
+print(newBeers)
+exit(0)
+indices = pd.Series(newBeers["id"].index)
+
+def recommend(index, cosineSim = cosineSimilarity):
+    id = indices[index]
+    # Retrieve pairwise similarity scores of all beers compared to that beer
+    similarityScores = list(enumerate(cosineSim[id]))
+    similarityScores = sorted(similarityScores, key = lambda x: x[1], reverse = True)
+    # Display top 10 beers most similar to input beer
+    similarityScores = similarityScores[1:11]
+    # Get beers index
+    beersIndex = [i[0] for i in similarityScores]
+    # Return top 10 most similar beers
+    return newBeers["id"].iloc[beersIndex]
+
+print(recommend(0))
